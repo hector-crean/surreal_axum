@@ -6,6 +6,8 @@ use surrealdb::{
     Error, Surreal,
 };
 
+use surrealdb::sql::Geometry::Point;
+
 #[derive(Clone)]
 pub struct Database {
     pub client: Surreal<Client>,

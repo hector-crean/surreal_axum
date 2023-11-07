@@ -1,12 +1,17 @@
-use models::credentials::Credentials;
-use serde::{Deserialize, Serialize};
+use axum::Json;
+use core::time::Duration;
+use models::{
+    body::Body,
+    credentials::Credentials,
+    spacetime_geometry::{CreateSpacetimeGeometry, SpacetimeGeometry},
+    user::{CreateUser, User},
+};
 use surrealdb::{
     engine::remote::ws::{Client, Ws},
     opt::auth::{Jwt, Root, Scope},
-    Error, Surreal,
+    sql, Error, Surreal,
 };
-
-use surrealdb::sql::Geometry::Point;
+use tracing::info;
 
 #[derive(Clone)]
 pub struct Database {
@@ -26,41 +31,190 @@ impl Database {
             })
             .await?;
 
-        client
-            .use_ns("surreal")
-            .use_db("conversations")
-            .await
-            .unwrap();
+        client.use_ns("reg115").use_db("reg115").await.unwrap();
 
         let db = Database {
             client,
-            namespace: String::from("surreal"),
-            db_name: String::from("conversation"),
+            namespace: String::from("reg115"),
+            db_name: String::from("reg115"),
         };
+
+        info!("Db initialised");
 
         Ok(db)
     }
 
-    pub async fn query_custom(self) -> Result<surrealdb::Response, surrealdb::Error> {
-        let sql = "
-            SELECT marketing, count() FROM type::table($table) GROUP BY marketing
-        ";
-        let resp = self.client.query(sql).bind(("table", "person")).await?;
+    pub async fn create_user(
+        self,
+        Json(create_user_payload): Json<CreateUser>,
+    ) -> Result<Vec<Body<User>>, surrealdb::Error> {
+        // let sql = "
+        //     SELECT marketing, count() FROM type::table($table) GROUP BY marketing
+        // ";
+        // let resp = self.client.query(sql).bind(("table", "person")).await?;
 
-        Ok(resp)
+        let record: Vec<Body<User>> = self
+            .client
+            .create("user")
+            .content(create_user_payload)
+            .await?;
+
+        Ok(record)
     }
 
-    pub async fn sign_in<'a>(self, credentials: Credentials<'a>) -> Result<Jwt, surrealdb::Error> {
+    pub async fn get_users(self) -> Result<Vec<Body<User>>, surrealdb::Error> {
+        let record: Vec<Body<User>> = self.client.select("user").await?;
+
+        Ok(record)
+    }
+
+    pub async fn create_spacetime_geometry(
+        self,
+        Json(create_spacetime_geometry): Json<CreateSpacetimeGeometry>,
+    ) -> Result<Option<Body<SpacetimeGeometry>>, surrealdb::Error> {
+        let CreateSpacetimeGeometry {
+            author,
+            geometry,
+            timestamp,
+            text_body,
+            title,
+            duration,
+        } = create_spacetime_geometry;
+
+        let sql = r#"
+        CREATE spacetime_geometry SET 
+            geometry = $geometry,
+            author = $author,
+            timestamp = $timestamp,
+            title = $title,
+            text_body = $text_body,
+            duration = <duration> $duration;
+        "#;
+        let mut resp = self
+            .client
+            .query(sql)
+            .bind(("geometry", geometry))
+            .bind(("author", author))
+            .bind(("timestamp", timestamp))
+            .bind(("title", title))
+            .bind(("text_body", text_body))
+            .bind(("duration", duration))
+            .await?;
+
+        let records = resp.take::<Option<Body<SpacetimeGeometry>>>(0)?;
+
+        // let record: Vec<Body<SpacetimeGeometry>> = self
+        //     .client
+        //     .create("spacetime_geometry")
+        //     .content(create_spacetime_point)
+        //     .await?;
+
+        Ok(records)
+    }
+
+    pub async fn get_spacetime_geometries(
+        self,
+    ) -> Result<Vec<SpacetimeGeometry>, surrealdb::Error> {
+        let records = self.client.select("spacetime_point").await?;
+
+        Ok(records)
+    }
+
+    pub async fn signin<'a>(self, credentials: Credentials<'a>) -> Result<Jwt, surrealdb::Error> {
         let jwt = self
             .client
             .signin(Scope {
-                namespace: "test",
-                database: "test",
+                namespace: self.namespace.as_str(),
+                database: self.db_name.as_str(),
                 scope: "user",
                 params: credentials,
             })
             .await?;
 
         Ok(jwt)
+    }
+
+    pub async fn signup<'a>(self, credentials: Credentials<'a>) -> Result<Jwt, surrealdb::Error> {
+        let jwt = self
+            .client
+            .signup(Scope {
+                namespace: self.namespace.as_str(),
+                database: self.db_name.as_str(),
+                scope: "user",
+                params: credentials,
+            })
+            .await?;
+
+        Ok(jwt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use geo_types::Point;
+    use serde_json::json;
+    use surrealdb::sql;
+
+    use super::*;
+    use crate::error;
+
+    #[tokio::test]
+    async fn test_signup_user() -> Result<(), error::ApiError> {
+        let db = Database::init().await.expect("Database not started");
+
+        let jwt = db
+            .signup(Credentials {
+                name: "Simon Harris",
+                username: "simon harris",
+                password: "123456789",
+            })
+            .await?;
+
+        println!("{:?}", &jwt);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_user_test() -> Result<(), error::ApiError> {
+        let db = Database::init().await.expect("Database not started");
+
+        let payload = CreateUser {
+            name: String::from("Roby Crean"),
+            username: String::from("robycrean"),
+            password: String::from("password..."),
+        };
+
+        let resp = db.create_user(Json(payload)).await?;
+
+        for r in resp {
+            println!("{:?}", &r);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn create_spacetime_geometry_test() -> Result<(), error::ApiError> {
+        let db = Database::init().await.expect("Database not started");
+
+        let payload = CreateSpacetimeGeometry {
+            author: None,
+            geometry: (0., 0.).into(),
+            timestamp: 1.0,
+            title: String::from("A title"),
+            text_body: String::from("body"),
+            duration: sql::Duration::from_secs(2),
+        };
+
+        let resp = db.create_spacetime_geometry(Json(payload)).await?;
+
+        println!("{:?}", &resp);
+
+        // for r in resp {
+        //     println!("{:?}", &r);
+        // }
+
+        Ok(())
     }
 }

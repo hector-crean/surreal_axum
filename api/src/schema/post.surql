@@ -1,34 +1,17 @@
-DEFINE TABLE video_post SCHEMAFULL
+DEFINE TABLE post SCHEMAFULL
     PERMISSIONS
-        FOR select
-            --published posts can be seleted
-            WHERE published = true
-            -- A user can select all their own posts
-            OR user = $auth.id 
-        FOR create, update 
-            -- A user can create or update their own posts
-            WHERE user = $auth.id
-        FOR delete 
-            -- A user can delete their own posts
-            WHERE user = $auth.id
-            -- Or an admin can delete any posts
-            OR $auth.admin = true
+        FOR create WHERE $scope = 'user'
+        FOR select, update, delete WHERE author = $auth.id;
 
-
-DEFINE FIELD author ON video_post 
-    TYPE record<user> 
+DEFINE FIELD content ON post TYPE string DEFAULT "";
+DEFINE FIELD color ON post TYPE string ASSERT $value IN ['pink', 'purple'];
+DEFINE FIELD author ON post TYPE record<user> 
     VALUE $before OR $auth.id 
     DEFAULT $auth.id;
 
-DEFINE FIELD created_at ON video_post 
+DEFINE FIELD created ON post TYPE datetime
     VALUE $before OR time::now()
     DEFAULT time::now();
-
-DEFINE FIELD updated_at ON video_post 
+DEFINE FIELD updated ON post TYPE datetime
     VALUE time::now()
     DEFAULT time::now();
-
-DEFINE FIELD screen_coordinates ON VIDEO_POST
-    TYPE Point;
-
-

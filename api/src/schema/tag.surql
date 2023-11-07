@@ -8,10 +8,10 @@ DEFINE FIELD owner ON tag TYPE record<user>
     VALUE $before OR $auth.id 
     DEFAULT $auth.id;
 
-DEFINE FIELD created ON tag 
+DEFINE FIELD created ON tag TYPE datetime
     VALUE $before OR time::now()
     DEFAULT time::now();
-DEFINE FIELD updated ON tag 
+DEFINE FIELD updated ON tag  TYPE datetime
     VALUE time::now()
     DEFAULT time::now();
 

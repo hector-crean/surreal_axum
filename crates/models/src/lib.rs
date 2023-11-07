@@ -1,4 +1,9 @@
+pub mod body;
 pub mod coordinate_system;
 pub mod credentials;
+pub mod payload;
 pub mod random;
+pub mod session_token;
+pub mod spacetime_geometry;
+pub mod user;
 pub mod video_post;

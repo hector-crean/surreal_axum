@@ -17,3 +17,4 @@ thiserror = "1.0.38"
 chrono = { version = "0.4.24", features = ["serde"] }
 strum = { version = "0.24.1", features = ["derive"] }
 geo-types = { version = "0.7", features = ["serde"] }
+surrealdb = "1.0.0"

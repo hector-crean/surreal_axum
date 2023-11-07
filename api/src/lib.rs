@@ -1,16 +1,24 @@
+pub mod auth;
 pub mod db;
-pub use db::Database;
-
 pub mod error;
 pub mod services;
+
+use crate::services::open_ai;
+use auth::auth;
 use axum::{
     extract::DefaultBodyLimit,
+    middleware,
     routing::{get, post},
     Router,
 };
+pub use db::Database;
 use http::{header::CONTENT_TYPE, Method};
 use models::random::Random;
-
+use open_ai_api::OpenAiClient;
+use services::{
+    geometry::{get::get_spacetime_geometries, post::create_spacetime_geometry},
+    user::{get::get_users, post::create_user},
+};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
@@ -21,14 +29,19 @@ use tracing::Level;
 pub struct AppState {
     db: Database,
     random: Random,
+    open_ai_client: OpenAiClient,
 }
 
 impl AppState {
-    pub fn new(db: Database, random: Random) -> Self {
-        Self { db, random }
+    pub fn new(db: Database, random: Random, open_ai_client: OpenAiClient) -> Self {
+        Self {
+            db,
+            random,
+            open_ai_client,
+        }
     }
 
-    pub async fn router(self) -> error::ApiResult<axum::Router> {
+    pub async fn router(self) -> Result<axum::Router, error::ApiError> {
         let http_trace_layer = TraceLayer::new_for_http()
             .make_span_with(
                 DefaultMakeSpan::new()
@@ -48,13 +61,21 @@ impl AppState {
             .allow_origin(Any)
             .allow_headers([CONTENT_TYPE]);
 
-        let router = Router::new().with_state(self);
+        let router = Router::new()
+            .route("/user", get(get_users).post(create_user))
+            .route("/user/:user_id/", post(open_ai::create_chat))
+            .route(
+                "/point",
+                get(get_spacetime_geometries).post(create_spacetime_geometry),
+            )
+            .with_state(self);
 
         let api = Router::new()
             .nest("/:version/api", router)
             .layer(DefaultBodyLimit::max(1024 * 1024 * 1024))
             .layer(CorsLayer::permissive())
             .layer(http_trace_layer);
+        // .route_layer(middleware::from_fn(auth));
         Ok(api)
     }
 }

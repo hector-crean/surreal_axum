@@ -6,23 +6,26 @@ use thiserror::Error;
 use uuid::Uuid;
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum ApiError {
     #[error(transparent)]
     SerdeJson(#[from] serde_json::Error),
     #[error(transparent)]
     SurrealDb(#[from] surrealdb::Error),
     #[error(transparent)]
     JsonWebtoken(#[from] jsonwebtoken::errors::Error),
+    #[error(transparent)]
+    Axum(#[from] axum::Error),
+    #[error(transparent)]
+    OpenAiClient(#[from] open_ai_api::OpenAiClientError),
 }
 
 // ApiError has to have the req_id to report to the client and implements IntoResponse.
-pub type ApiResult<T> = Result<T, Error>;
 
 // REST error response
-impl IntoResponse for Error {
+impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
         let status_code = match &self {
-            Error::SerdeJson { .. } => StatusCode::BAD_REQUEST,
+            ApiError::SerdeJson { .. } => StatusCode::BAD_REQUEST,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         let body = Json(json!({

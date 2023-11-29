@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use geo_types::Point;
+use geo::Point;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VideoComment {

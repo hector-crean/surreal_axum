@@ -16,7 +16,7 @@ pub enum ApiError {
     #[error(transparent)]
     Axum(#[from] axum::Error),
     #[error(transparent)]
-    OpenAiClient(#[from] open_ai_api::OpenAiClientError),
+    OpenAiClient(#[from] open_ai_client::OpenAiClientError),
 }
 
 // ApiError has to have the req_id to report to the client and implements IntoResponse.

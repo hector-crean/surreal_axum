@@ -1,0 +1,10 @@
+[core]
+    path = "./db"
+    schema = "less"
+
+[db]
+    address = "ws://localhost:8000"
+    username = "root"
+    password = "root"
+    ns = "reg115"
+    db = "reg115"

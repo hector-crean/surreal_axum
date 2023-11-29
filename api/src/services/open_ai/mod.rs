@@ -2,7 +2,7 @@ use axum::{
     extract::State,
     response::{IntoResponse, Json, Response},
 };
-use open_ai_api::{
+use open_ai_client::{
     self,
     chat::{
         request::{ChatCompletionMessage, ChatCompletionRequest},

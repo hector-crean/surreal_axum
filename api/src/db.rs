@@ -47,13 +47,13 @@ impl Database {
     pub async fn create_user(
         self,
         Json(create_user_payload): Json<CreateUser>,
-    ) -> Result<Vec<Body<User>>, surrealdb::Error> {
+    ) -> Result<Vec<User>, surrealdb::Error> {
         // let sql = "
         //     SELECT marketing, count() FROM type::table($table) GROUP BY marketing
         // ";
         // let resp = self.client.query(sql).bind(("table", "person")).await?;
 
-        let record: Vec<Body<User>> = self
+        let record: Vec<User> = self
             .client
             .create("user")
             .content(create_user_payload)
@@ -71,7 +71,7 @@ impl Database {
     pub async fn create_spacetime_geometry(
         self,
         Json(create_spacetime_geometry): Json<CreateSpacetimeGeometry>,
-    ) -> Result<Option<Body<SpacetimeGeometry>>, surrealdb::Error> {
+    ) -> Result<Vec<Body<SpacetimeGeometry>>, surrealdb::Error> {
         let CreateSpacetimeGeometry {
             author,
             geometry,
@@ -82,13 +82,17 @@ impl Database {
         } = create_spacetime_geometry;
 
         let sql = r#"
-        CREATE spacetime_geometry SET 
-            geometry = $geometry,
-            author = $author,
-            timestamp = $timestamp,
-            title = $title,
-            text_body = $text_body,
-            duration = <duration> $duration;
+            BEGIN TRANSACTION;
+            LET $spacetime_geometry = CREATE spacetime_geometry CONTENT {
+                geometry: $geometry,
+                author: $author,
+                timestamp: $timestamp,
+                title: $title,
+                text_body: $text_body,
+                duration: <duration> $duration
+            };
+            RETURN $spacetime_geometry;
+            COMMIT TRANSACTION;
         "#;
         let mut resp = self
             .client
@@ -101,12 +105,12 @@ impl Database {
             .bind(("duration", duration))
             .await?;
 
-        let records = resp.take::<Option<Body<SpacetimeGeometry>>>(0)?;
+        let records = resp.take::<Vec<Body<SpacetimeGeometry>>>(0)?;
 
-        // let record: Vec<Body<SpacetimeGeometry>> = self
+        // let records: Vec<Body<SpacetimeGeometry>> = self
         //     .client
         //     .create("spacetime_geometry")
-        //     .content(create_spacetime_point)
+        //     .content(create_spacetime_geometry)
         //     .await?;
 
         Ok(records)
@@ -151,12 +155,12 @@ impl Database {
 
 #[cfg(test)]
 mod tests {
-    use geo_types::Point;
-    use serde_json::json;
-    use surrealdb::sql;
+    use geo_types::{point, polygon, Geometry, GeometryCollection};
+    use geojson::Feature;
 
     use super::*;
     use crate::error;
+    use serde::{Deserialize, Serialize};
 
     #[tokio::test]
     async fn test_signup_user() -> Result<(), error::ApiError> {
@@ -195,25 +199,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_spacetime_geometry_test() -> Result<(), error::ApiError> {
+    async fn create_spacetime_geometry() -> Result<(), error::ApiError> {
         let db = Database::init().await.expect("Database not started");
 
-        let payload = CreateSpacetimeGeometry {
-            author: None,
-            geometry: (0., 0.).into(),
-            timestamp: 1.0,
-            title: String::from("A title"),
-            text_body: String::from("body"),
-            duration: sql::Duration::from_secs(2),
-        };
+        let p: sql::Geometry = polygon![
+            (x: -111., y: 45.),
+            (x: -111., y: 41.),
+            (x: -104., y: 41.),
+            (x: -104., y: 45.),
+        ]
+        .into();
 
-        let resp = db.create_spacetime_geometry(Json(payload)).await?;
+        let sql = r#"
+            CREATE spacetime_geometry CONTENT {
+               duration: <duration> "3w",
+               geometry: $geometry,
+               text_body: "text",
+               title: "title",
+               timestamp: 1.0,
+            };"#;
 
-        println!("{:?}", &resp);
+        let mut query = db.client.query(sql).bind(("geometry", p));
 
-        // for r in resp {
-        //     println!("{:?}", &r);
-        // }
+        let mut resp = query.await?;
+
+        let res = &resp.take::<Option<SpacetimeGeometry>>(0)?;
+
+        println!("resp: {:?}", &res);
+
+        // geometry<line|polygon|multipoint|multiline|multipolygon|collection>
+
+        // This fails with the below error
+        // let spacetime_geo: Option<SpacetimeGeometry> = response.take(0)?;
+
+        // println!("{:?}", &spacetime_geo);
+        // Fails just like the above
+        // let users: Option<sql::Value> = response.take(0)?;
+
+        // Works
+        // let users: Option<serde_json::Value> = response.take(0)?;
 
         Ok(())
     }

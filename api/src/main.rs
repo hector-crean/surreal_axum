@@ -1,7 +1,8 @@
 use api::{error, AppState, Database};
 use dotenv::dotenv;
+use include_dir::{include_dir, Dir};
 use once_cell::sync::Lazy;
-use open_ai_api::OpenAiClient;
+use open_ai_client::OpenAiClient;
 use pbkdf2::password_hash::rand_core::OsRng;
 use rand_chacha::ChaCha8Rng;
 use rand_core::{RngCore, SeedableRng};
@@ -14,9 +15,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 use surrealdb::Surreal;
+use surrealdb_migrations::MigrationRunner;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 use tracing_subscriber::{filter::EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+
 // static DB: Lazy<Surreal<Client>> = Lazy::new(Surreal::init);
 
 pub struct Config {
@@ -42,7 +45,7 @@ async fn main() -> Result<(), error::ApiError> {
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         // axum logs rejections from built-in extractors with the `axum::rejection`
         // target, at `TRACE` level. `axum::rejection=trace` enables showing those events
-        "example_tracing_aka_logging=debug,tower_http=debug,axum::rejection=trace,parelthon_server=debug,error,info".into()
+        "example_tracing_aka_logging=debug,tower_http=debug,axum::rejection=trace,api=debug,error,info".into()
     });
 
     tracing_subscriber::registry()
@@ -61,6 +64,15 @@ async fn main() -> Result<(), error::ApiError> {
     tracing::debug!("listening on {}", addr);
 
     let db = Database::init().await.expect("Database not started");
+
+    // Apply all migrations
+    const DB_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/db");
+
+    let runner = MigrationRunner::new(&db.client)
+        .load_files(&DB_DIR) // Will look for embedded files instead of the filesystem
+        .up()
+        .await
+        .unwrap();
 
     let random = ChaCha8Rng::seed_from_u64(OsRng.next_u64());
 

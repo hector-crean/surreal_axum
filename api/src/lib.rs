@@ -8,17 +8,14 @@ use auth::auth;
 use axum::{
     extract::DefaultBodyLimit,
     middleware,
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 pub use db::Database;
 use http::{header::CONTENT_TYPE, Method};
 use models::random::Random;
-use open_ai_api::OpenAiClient;
-use services::{
-    geometry::{get::get_spacetime_geometries, post::create_spacetime_geometry},
-    user::{get::get_users, post::create_user},
-};
+use open_ai_client::OpenAiClient;
+use services::{geometry, user};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
@@ -62,16 +59,21 @@ impl AppState {
             .allow_headers([CONTENT_TYPE]);
 
         let router = Router::new()
-            .route("/user", get(get_users).post(create_user))
-            .route("/user/:user_id/", post(open_ai::create_chat))
             .route(
-                "/point",
-                get(get_spacetime_geometries).post(create_spacetime_geometry),
+                "/user/:id",
+                post(user::create)
+                    .get(user::read)
+                    .put(user::update)
+                    .delete(user::delete),
             )
+            .route("/user", get(user::list))
+            .route("/user/:id/chat", post(open_ai::create_chat))
+            .route("/geometry/:id", get(user::read))
+            .route("/geometry", get(geometry::list).post(geometry::create))
             .with_state(self);
 
         let api = Router::new()
-            .nest("/:version/api", router)
+            .nest("/v1/api", router)
             .layer(DefaultBodyLimit::max(1024 * 1024 * 1024))
             .layer(CorsLayer::permissive())
             .layer(http_trace_layer);

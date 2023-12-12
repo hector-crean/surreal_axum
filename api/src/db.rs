@@ -1,10 +1,9 @@
 use axum::Json;
 use core::time::Duration;
 use models::{
-    body::Body,
     credentials::Credentials,
-    spacetime_geometry::{CreateSpacetimeGeometry, SpacetimeGeometry},
     user::{CreateUser, User},
+    video_label::{CreateVideoLabel, VideoLabel},
 };
 use surrealdb::{
     engine::remote::ws::{Client, Ws},

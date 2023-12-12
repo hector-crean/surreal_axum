@@ -15,7 +15,7 @@ pub use db::Database;
 use http::{header::CONTENT_TYPE, Method};
 use models::random::Random;
 use open_ai_client::OpenAiClient;
-use services::{geometry, user};
+use services::user;
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
@@ -69,7 +69,7 @@ impl AppState {
             .route("/user", get(user::list))
             .route("/user/:id/chat", post(open_ai::create_chat))
             .route("/geometry/:id", get(user::read))
-            .route("/geometry", get(geometry::list).post(geometry::create))
+            .route("/geometry", get(video::list).post(video::create))
             .with_state(self);
 
         let api = Router::new()

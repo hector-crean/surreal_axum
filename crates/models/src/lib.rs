@@ -1,11 +1,12 @@
-pub mod body;
+pub mod color;
 pub mod coordinate_system;
 pub mod credentials;
-pub mod geometry;
-pub mod payload;
+pub mod interval;
 pub mod random;
 pub mod record;
+pub mod rich_text;
 pub mod session_token;
-pub mod spacetime_geometry;
+pub mod style;
 pub mod user;
-pub mod video_post;
+pub mod video;
+pub mod video_label;

@@ -43,6 +43,9 @@ surrealdb-migrations = "1.0.0"
 include_dir = "0.7.3"
 geojson = { version = "0.24.1", features = ["geo-types"]}
 geo = { version = "0.26.0", features = ["serde"] }
+aws-sdk-s3 = "1.5.0"
+axum_typed_multipart = "0.11.0"
+tempfile = "3.8.1"
 
 # Defining bin here to make multi stage docker build work
 [[bin]]

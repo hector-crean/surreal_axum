@@ -15,7 +15,7 @@ pub use db::Database;
 use http::{header::CONTENT_TYPE, Method};
 use models::random::Random;
 use open_ai_client::OpenAiClient;
-use services::user;
+use services::{s3::S3Bucket, user};
 use tower_http::{
     cors::{Any, CorsLayer},
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
@@ -27,14 +27,21 @@ pub struct AppState {
     db: Database,
     random: Random,
     open_ai_client: OpenAiClient,
+    bucket: S3Bucket,
 }
 
 impl AppState {
-    pub fn new(db: Database, random: Random, open_ai_client: OpenAiClient) -> Self {
+    pub fn new(
+        db: Database,
+        random: Random,
+        open_ai_client: OpenAiClient,
+        bucket: S3Bucket,
+    ) -> Self {
         Self {
             db,
             random,
             open_ai_client,
+            bucket,
         }
     }
 
